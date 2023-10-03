@@ -1,0 +1,46 @@
+parameters:
+  - name: connectedServiceName
+    type: string
+
+  - name: subscriptionId
+    type: string
+
+  - name: location
+    type: string
+
+  - name: parameterFileDirectory
+    type: string
+
+steps:
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      buildType: current
+      targetPath: $(Pipeline.Workspace)
+    displayName: Download Pipeline Artifact
+
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: ${{ parameters.connectedServiceName }}
+      scriptType: pscore
+      scriptLocation: inlineScript
+      inlineScript: |
+        az deployment sub create `
+        --location ${{ parameters.location }} `
+        --name 'deployResourceGroup-${{ parameters.location }}' `
+        --template-file $(bicepFilePath)/resourceGroup.bicep `
+        --parameters "${{ parameters.parameterFileDirectory }}/resourceGroup.bicepparam" `
+        --verbose
+    displayName: Deploy Resource Group in ${{ parameters.location }}
+
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: ${{ parameters.connectedServiceName }}
+      scriptType: pscore
+      scriptLocation: inlineScript
+      inlineScript: |
+        $output = az deployment sub show --name 'deployResourceGroup-${{ parameters.location }}' --query 'properties.outputs' | ConvertFrom-Json
+        foreach ($key in $output.psobject.properties.name) {
+          $value = $output.$key.value
+          Write-Host "##vso[task.setvariable variable=$key;]$value"
+        }
+    displayName: Fetch Deployment Outputs and Set as Azure DevOps Variables

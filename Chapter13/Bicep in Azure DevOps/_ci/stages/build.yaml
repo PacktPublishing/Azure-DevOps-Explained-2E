@@ -1,0 +1,30 @@
+stages:
+  - stage: build
+    displayName: Build
+    jobs:
+      - job: Build
+        pool:
+          vmImage: windows-latest
+        steps:
+        - checkout: self
+          clean: true
+
+        - task: CopyFiles@2
+          displayName: Copy bicep files to build directory
+          inputs:
+            SourceFolder: $(Build.SourcesDirectory)/bicep/
+            Contents: |
+              **
+            TargetFolder: $(Build.ArtifactStagingDirectory)/bicep/
+
+        - task: CopyFiles@2
+          displayName: Copy parameters to build directory
+          inputs:
+            SourceFolder: $(Build.SourcesDirectory)/parameters
+            Contents: |
+              **
+            TargetFolder: $(Build.ArtifactStagingDirectory)/parameters
+
+        - publish: $(Build.ArtifactStagingDirectory)
+          artifact: build
+          displayName: Publish build artifact

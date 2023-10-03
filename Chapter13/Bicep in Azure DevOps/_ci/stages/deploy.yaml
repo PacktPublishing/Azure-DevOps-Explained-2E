@@ -1,0 +1,63 @@
+parameters:
+  - name: connectedServiceName
+    type: string
+
+  - name: subscriptionId
+    type: string
+
+  - name: environment
+    type: string
+
+  - name: location
+    type: string
+  
+  - name: dependsOn
+    type: string
+
+  - name: condition
+    type: string
+stages:
+  - stage: ${{ format('deploy_{0}', parameters.environment ) }}
+    displayName: Deploy ${{ parameters.environment }}
+    dependsOn: ${{ parameters.dependsOn }}
+    condition: ${{ parameters.condition }}
+    variables:
+      - template: /_ci/variables/deployVariables.yaml
+    pool:
+      vmImage: windows-latest
+    displayName: Deploy ${{ parameters.environment }}
+    jobs:
+      - ${{ each location in split(parameters.location, ', ') }}:
+        - deployment:
+          displayName: ${{ format('{0} - {1}', parameters.environment, location )}}
+          environment: ${{ parameters.environment }}
+          variables:
+            - template: ${{ format('/_ci/variables/{0}.yaml', replace(location,' ','') ) }}
+            - name: baseParameterFilePath
+              value: $(buildParameterFilePath)/${{ location }}/${{ parameters.environment }}
+            - name: parameterFilePath
+              value: $(baseParameterFilePath)/core-${{ parameters.environment }}-$(locationShort)-rg
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                  - template: /_ci/steps/deployPipelineFoundation.yaml
+                    parameters:
+                      connectedServiceName: ${{ parameters.connectedServiceName }}
+                      subscriptionId: ${{ parameters.subscriptionId }}
+                      location: ${{ format('{0}', replace(location,' ','') ) }}
+                      parameterFileDirectory: $(parameterFilePath)
+
+                  - task: AzureCLI@2
+                    inputs:
+                      azureSubscription: ${{ parameters.connectedServiceName }}
+                      scriptType: pscore
+                      scriptLocation: inlineScript
+                      inlineScript: |
+                        az deployment group create `
+                        --resource-group $(resourceGroupName) `
+                        --template-file "$(buildBicepPath)/main.bicep" `
+                        --parameters "$(parameterFilePath)/main.bicepparam" `
+                        --verbose
+                    displayName: Deploy Landing Zone in ${{ location }}
+                  

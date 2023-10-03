@@ -1,0 +1,6 @@
+variables:
+  artifactPath: $(Pipeline.Workspace)/build
+  buildBicepPath: $(artifactPath)/bicep
+  bicepModulePath: $(buildBicepPath)/modules
+  bicepFilePath: $(buildBicepPath)/files
+  buildParameterFilePath: $(artifactPath)/parameters
